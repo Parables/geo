@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton\Commands;
+namespace Parables\Geo\Commands;
 
 use Illuminate\Console\Command;
 
-class SkeletonCommand extends Command
+class GeoCommand extends Command
 {
-    public $signature = 'skeleton';
+    public $signature = 'geo';
 
     public $description = 'My command';
 
