@@ -11,4 +11,10 @@ parameters:
     checkOctaneCompatibility: true
     checkModelProperties: true
     checkMissingIterableValueType: false
-
+    strictRules:
+        allRules: false
+	ergebnis:
+		final:
+			enabled: false
+		noExtends:
+			enabled: false
