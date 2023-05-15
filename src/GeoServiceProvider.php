@@ -19,7 +19,9 @@ class GeoServiceProvider extends PackageServiceProvider
             ->name('geo')
             ->hasConfigFile()
             ->hasViews()
-            ->hasMigration('create_geo_table')
+            //->hasMigration('create_geo_table')
+            ->hasMigrations(['create_geoname_table'])
+            ->runsMigrations()
             ->hasCommand(GeoCommand::class);
     }
 }
