@@ -4,10 +4,12 @@ namespace Parables\Geo\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Kalnoy\Nestedset\NodeTrait;
+use Parables\Geo\GeoNameTrait;
 
 class GeoName extends Model
 {
     use NodeTrait;
+    use GeoNameTrait;
 
     /**
      * The table associated with the model.

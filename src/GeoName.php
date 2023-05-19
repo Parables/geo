@@ -77,6 +77,7 @@ class GeoName
             "dem" => $this->dem(),
             "timezone" => $this->timezone(),
             "modification_date" => $this->modificationDate(),
+            //"parent_id" => $this->parentId(),
         ];
     }
 
