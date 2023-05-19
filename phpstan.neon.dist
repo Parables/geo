@@ -13,8 +13,8 @@ parameters:
     checkMissingIterableValueType: false
     strictRules:
         allRules: false
-	ergebnis:
-		final:
-			enabled: false
-		noExtends:
-			enabled: false
+    ergebnis:
+        final:
+            enabled: false
+        noExtends:
+            enabled: false
