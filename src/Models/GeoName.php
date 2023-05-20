@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Parables\Geo\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -19,9 +21,34 @@ class GeoName extends Model
     protected $table = 'geonames';
 
     /**
-     * The attributes that aren't mass assignable.
+     * The attributes that are mass assignable.
      *
-     * @var array
+     * @var array<string>
      */
-    protected $guarded = [];
+    protected $fillable = [
+        'id',
+        'name',
+        'ascii_name',
+        'alternate_names',
+        'latitude',
+        'longitude',
+        'feature_code',
+        'feature_class',
+        'country_code',
+        'cc2',
+        'admin1_code',
+        'admin2_code',
+        'admin3_code',
+        'admin4_code',
+        'population',
+        'elevation',
+        'dem',
+        'timezone',
+        'modification_date',
+        'created_at',
+        'updated_at',
+        '_lft',
+        '_rgt',
+        'parent_id',
+    ];
 }

@@ -26,7 +26,7 @@ class LoadGeonamesAction
         return $geonamesCollection
             ->chunk($chunkSize)
             ->each(function (LazyCollection $collection) {
-                DB::table('geonames')->insert($collection->all());
+                DB::table('geonames')->insertOrIgnore($collection->all());
             });
     }
 }

@@ -28,8 +28,9 @@ return new class extends Migration
             $table->string('dem')->nullable();
             $table->string('timezone')->nullable();
             $table->string('modification_date')->nullable();
-            $table->timestamps();
             $table->nestedSet();
+            $table->integer('depth')->nullable();
+            $table->timestamps();
         });
     }
     public function down()
