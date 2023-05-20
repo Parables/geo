@@ -1,19 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Parables\Geo\Actions;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\LazyCollection;
 use Parables\Geo\Actions\Concerns\HasToastable;
 
-class LoadCountryAction
+class LoadGeonamesAction
 {
     use HasToastable;
 
     /**
-     * @param LazyCollection $countryCollection
+     * @param LazyCollection $geonamesCollection
      */
-    public function execute(LazyCollection $countryCollection, int $chunkSize = 1000, bool $truncateBeforeInsert = false): LazyCollection
+    public function execute(LazyCollection $geonamesCollection, int $chunkSize = 1000, bool $truncateBeforeInsert = false): LazyCollection
     {
         ini_set('memory_limit', -1);
 
@@ -21,7 +23,7 @@ class LoadCountryAction
             DB::table('geonames')->truncate();
         }
 
-        return $countryCollection
+        return $geonamesCollection
             ->chunk($chunkSize)
             ->each(function (LazyCollection $collection) {
                 DB::table('geonames')->insert($collection->all());

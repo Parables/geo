@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Parables\Geo\Actions;
 
 use Parables\Geo\Actions\Fixtures\Toastable;
@@ -8,32 +10,32 @@ it('takes a countryCollection and a hierarchyCollection and builds a nested set 
 
     $toastable  = new Toastable();
 
-    $countryCollection = (new ExtractCountryAction)
+    $geonamesCollection = (new ReadFileAction)
         ->toastable($toastable)
         ->execute(storage_path('geo/GH.txt'));
     //->execute(storage_path('geo/allCountries.txt'));
 
-    $toastable->toast('Fetched ' . count($countryCollection) . ' countries');
+    $toastable->toast('Fetched ' . count($geonamesCollection) . ' geonames');
 
-    $countryCollection = (new TransformCountryAction)
+    $geonamesCollection = (new TransformGeonamesAction)
         ->toastable($toastable)
         ->execute(
-            countryCollection: $countryCollection,
+            geonamesCollection: $geonamesCollection,
             toPayload: true,
             idAsindex: true,
         );
 
-    $toastable->toast('Transformed countries into an array of ' . count($countryCollection) . ' GeoNames');
+    $toastable->toast('Transformed file contents into an collection of ' . count($geonamesCollection) . ' GeoNames');
 
-    $countryCollection = (new LoadCountryAction)
+    $geonamesCollection = (new LoadGeonamesAction)
         ->toastable($toastable)
         ->execute(
-            countryCollection: $countryCollection,
+            geonamesCollection: $geonamesCollection,
             chunkSize: 1000,
             truncateBeforeInsert: true,
         );
 
-    $toastable->toast('Loaded ' . $countryCollection->count() . 'chunks(each containing 1000 entries) into the database.');
+    $toastable->toast('Loaded ' . $geonamesCollection->count() . 'chunks(each containing 1000 entries) into the database.');
 
     expect('hi')->toBe('hi');
 });

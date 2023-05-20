@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Parables\Geo\Actions;
 
 use Parables\Geo\Actions\Fixtures\Toastable;
@@ -8,16 +10,16 @@ it('maps a countryCollection and returns a GeoName instance or an array payload'
 
     $toastable  = new Toastable();
 
-    $countryCollection = (new ExtractCountryAction)
+    $geonamesCollection = (new ReadFileAction)
         ->toastable($toastable)
         //    ->execute(storage_path('geo/GH.txt'));
         ->execute(storage_path('geo/allCountries.txt'));
 
-    $countryCollection = (new TransformCountryAction)
+    $geonamesCollection = (new TransformGeonamesAction)
         ->toastable($toastable)
-        ->execute($countryCollection);
+        ->execute($geonamesCollection);
 
-    print_r($countryCollection->all());
+    print_r($geonamesCollection->all());
 
     expect('hi')->toBe('hi');
 });
