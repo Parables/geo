@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Parables\Geo\Actions;
 
 use Parables\Geo\Actions\Concerns\HasToastable;
@@ -8,7 +10,7 @@ class UnzipAction
 {
     use HasToastable;
 
-    public function execute(string $fileName, bool $overwrite = true): void
+    public function execute(string $fileName, bool $overwrite = true): string
     {
         $zipFile = storage_path("geo/$fileName");
         $extractedFile = storage_path('geo/' . preg_replace('/\.zip/', '.txt', $fileName));
@@ -18,7 +20,7 @@ class UnzipAction
                 unlink($extractedFile);
             } else {
                 $this->toastable->toast('Skipping file extraction because the file: ' . $extractedFile . ' already exists...', 'warn');
-                return;
+                return $extractedFile;
             }
         }
 
@@ -27,8 +29,8 @@ class UnzipAction
             $zip->open($zipFile);
             $zip->extractTo(dirname($zipFile));
             $zip->close();
-        } else {
-            $this->toastable->toast($fileName . ' does not exits or it is not a zip file', 'error');
         }
+
+        return $extractedFile;
     }
 }

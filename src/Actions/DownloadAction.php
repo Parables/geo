@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Parables\Geo\Actions;
 
 use Parables\Geo\Actions\Concerns\HasToastable;
