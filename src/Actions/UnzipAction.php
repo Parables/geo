@@ -15,20 +15,24 @@ class UnzipAction
         $zipFile = storage_path("geo/$fileName");
         $extractedFile = storage_path('geo/' . preg_replace('/\.zip/', '.txt', $fileName));
 
-        if (file_exists($extractedFile)) {
-            if ($overwrite) {
-                unlink($extractedFile);
-            } else {
-                $this->toastable->toast('Skipping file extraction because the file: ' . $extractedFile . ' already exists...', 'warn');
-                return $extractedFile;
-            }
-        }
+        try {
 
-        if (file_exists($zipFile) && preg_match('/\.zip/', $fileName)) {
-            $zip = new \ZipArchive;
-            $zip->open($zipFile);
-            $zip->extractTo(dirname($zipFile));
-            $zip->close();
+            if (file_exists($extractedFile)) {
+                if ($overwrite) {
+                    unlink($extractedFile);
+                } else {
+                    return $extractedFile;
+                }
+            }
+
+            if (file_exists($zipFile) && preg_match('/\.zip/', $fileName)) {
+                $zip = new \ZipArchive;
+                $zip->open($zipFile);
+                $zip->extractTo(dirname($zipFile));
+                $zip->close();
+            }
+        } catch (\Throwable $th) {
+            $this->toastable->toast('Failed to unzip ' . $zipFile . PHP_EOL . 'Details: ' . $th->getMessage(), 'error');
         }
 
         return $extractedFile;

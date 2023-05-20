@@ -22,13 +22,15 @@ class BuildNestedSetAction
 
         $hierarchyCollection->chunk($chunkSize)->each(function (LazyCollection $lazyCollection) {
             $lazyCollection->each(function (string $line) {
-
                 [$parentId, $childId] = array_map('trim', explode("\t", $line));
+
                 $parent = GeoName::where('parent_id', $parentId)->first();
                 $child = GeoName::where('id', $childId)->first();
+
                 if ($parent && $child) {
                     $parent->appendNode($child);
                 }
+
                 // TODO: Handle cases for earth and continents as roots
                 // if ($parent->isEarth()) {
                 // $parent->makeRoot()->save();

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Parables\Geo;
 
 use Spatie\LaravelPackageTools\Package;
@@ -21,7 +23,7 @@ class GeoServiceProvider extends PackageServiceProvider
             ->hasViews()
             //->hasMigration('create_geo_table')
             ->hasMigrations(['create_geoname_table'])
-            ->runsMigrations()
+            //->runsMigrations()
             ->hasCommand(GeoCommand::class);
     }
 }
