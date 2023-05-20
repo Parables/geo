@@ -1,16 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Parables\Geo\Actions;
 
 use Illuminate\Support\LazyCollection;
 use Parables\Geo\Actions\Concerns\HasToastable;
-use Parables\Geo\Actions\Contracts\FileDataExtractor;
 
-class ReadFileAction implements FileDataExtractor
+class ReadFileAction
 {
     use HasToastable;
-
-
 
     public function execute(string $fileName): LazyCollection
     {
