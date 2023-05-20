@@ -12,16 +12,15 @@ class TransformGeonamesAction
 {
     use HasToastable;
     /**
-     * @param LazyCollection $geonamesCollection
+     * @param LazyCollection $lines
      */
-    public function execute(LazyCollection $geonamesCollection, bool $toPayload = true, bool $idAsindex = true): LazyCollection
+    public function execute(LazyCollection $lines, bool $toPayload = true, bool $idAsindex = true): LazyCollection
     {
-        $geonamesCollection = $geonamesCollection
-            ->map(function (string $item, string &$key) use ($toPayload, $idAsindex) {
-                $geoname = GeoName::fromString($item);
-                $key = $idAsindex ? $geoname->id() : $key;
-                return $toPayload ? $geoname->toPayload() : $geoname;
-            });
+        $geonamesCollection = $lines->map(function (string $line, string &$key) use ($toPayload, $idAsindex) {
+            $geoname = GeoName::fromString($line);
+            $key = $idAsindex ? $geoname->id() : $key;
+            return $toPayload ? $geoname->toPayload() : $geoname;
+        });
 
         return $geonamesCollection;
     }
