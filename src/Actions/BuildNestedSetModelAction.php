@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Parables\Geo\Actions;
 
 use Illuminate\Support\Arr;
-use Parables\Geo\Actions\Fixtures\Toastable;
+use Parables\Geo\Actions\Concerns\HasToastable;
 
-class PopulateGeonameTableAction
+class BuildNestedSetModelAction
 {
+    use HasToastable;
+
     /**
      * @param array<int|string,mixed> $hierarchy
      * @return array
@@ -16,31 +18,12 @@ class PopulateGeonameTableAction
     public function execute(array $hierarchy = [], bool $nestChildren = false): array
     {
         if (empty($hierarchy)) {
-            $hierarchy = $this->hierarchy();
+            return [];
         }
 
-        // TODO: USe the childId/id as the key if true, or default back to auto index key
-        // TODO: use Upsert https://laravel.com/docs/10.x/queries#upserts to update the geonames table
         return $this->buildTree(hierarchy: $hierarchy, nestChildren: $nestChildren);
     }
 
-
-    public function hierarchy(): array
-    {
-        $hierarchy = [];
-
-        $toastable = new Toastable();
-
-        (new ReadFileAction)
-            ->toastable($toastable)
-            ->execute(storage_path('geo/hierarchy.txt'))
-            ->each(function (string $line) use (&$hierarchy) {
-                [$parentId, $childId] = array_map('trim', explode("\t", $line));
-                $hierarchy[$parentId][] = $childId;
-            });
-
-        return $hierarchy;
-    }
 
     /**
      * @param array<int|string,mixed> $hierarchy
@@ -53,8 +36,8 @@ class PopulateGeonameTableAction
 
         $root = [
             'id' => $rootId,
-            'left' => $index++,
-            'right' => null,
+            '_lft' => $index++,
+            '_rgt' => null,
             'depth' => $depth,
             'parent_id' => null,
         ];
@@ -67,18 +50,21 @@ class PopulateGeonameTableAction
             nestChildren: $nestChildren
         );
 
-        $root['right'] = $index++;
+        $root['_rgt'] = $index++;
 
         if ($nestChildren) {
             $root['children'] = $children;
             return $root;
         }
-        return [$rootId => $root, ...$children];
+        return [$rootId => $root] + $children;
+        // return array_merge([$rootId => $root], $children);
+        //$children[$rootId] = $root;
+        //return $children;
     }
 
     /**
      * @param array<int|string,mixed> $hierarchy
-     * @return array<int,array<string,mixed>>
+     * @return array
      */
     public function buildNodes(array $hierarchy, string|int $parentId, int &$index, int $depth, bool $nestChildren = false): array
     {
@@ -89,8 +75,8 @@ class PopulateGeonameTableAction
             $node =
                 [
                     'id' => $id,
-                    'left' => $index++,
-                    'right' => null,
+                    '_lft' => $index++,
+                    '_rgt' => null,
                     'depth' => $depth,
                     'parent_id' => $parentId,
                 ];
@@ -103,20 +89,13 @@ class PopulateGeonameTableAction
                 nestChildren: $nestChildren
             );
 
+            $node['_rgt'] = $index++;
+
             if ($nestChildren) {
                 $node['children'] = $children;
-            }
-
-            $node['right'] = $index++;
-
-            if ($nestChildren) {
-                $result[] = $node;
-            } else {
                 $result[$id] = $node;
-            }
-
-            if (!$nestChildren) {
-                $result = [...$result, ...$children];
+            } else {
+                $result = $result + [$id => $node] + $children;
             }
         }
         return $result;
@@ -131,19 +110,22 @@ class PopulateGeonameTableAction
     }
 
     /**
-     * @param mixed $tree
-     * @param mixed $result
+     * @param array $tree
+     * @param array $result
+     * @param bool $includeLeaves
      * @return mixed
      */
-    function flattenTree($tree, &$result = [])
+    function flattenTree(array $tree, array &$result = [], bool $includeLeaves = false)
     {
         foreach ($tree as $key => $value) {
             if (is_array($value) && !empty($value)) {
                 $result[$key] = array_keys($value);
-                $this->flattenTree($value, $result);
-            } // else {
-            // $result[$key] = [];
-            // }
+                $this->flattenTree($value, $result, $includeLeaves);
+            } else {
+                if ($includeLeaves) {
+                    $result[$key] = [];
+                }
+            }
         }
 
         return $result;
