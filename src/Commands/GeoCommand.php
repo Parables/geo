@@ -274,8 +274,9 @@ class GeoCommand extends Command implements Toastable
         $this->info('Building Nested Set Model...');
 
         // Download and unzip the hierarchy.zip file
-        $this->downloadFiles(fileNames: ['hierarchy.zip']);
-        $this->unzipFiles(['hierarchy.txt']);
+        $fileNames =  ['hierarchy.zip'];
+        $this->downloadFiles(fileNames: $fileNames);
+        $this->unzipFiles(fileNames: $fileNames);
 
         // then the BuildNestedSetModelAction will take it from there
         LazyCollection::wrap(
@@ -284,11 +285,9 @@ class GeoCommand extends Command implements Toastable
                 ->execute()
         )->chunk(1000)
             ->each(function (LazyCollection $collection) {
-                DB::table('geonames')->upsert(
-                    values: $collection->all(),
-                    uniqueBy: ['id'],
-                    update: ['_lft', '_rgt', 'parent_id', 'depth']
-                );
+                $collection->each(function (array $payload) {
+                    DB::table('geonames')->where('id', $payload['id'])->update($payload);
+                });
             });
     }
 

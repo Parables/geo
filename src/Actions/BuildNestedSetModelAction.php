@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Parables\Geo\Actions;
 
 use Illuminate\Support\Arr;
-use Parables\Geo\Actions\Fixtures\Toastable;
+use Parables\Geo\Actions\Concerns\HasToastable;
 
-class PopulateGeonameTableAction
+class BuildNestedSetModelAction
 {
+    use HasToastable;
+
     /**
      * @param array<int|string,mixed> $hierarchy
      * @return array
@@ -19,8 +21,6 @@ class PopulateGeonameTableAction
             $hierarchy = $this->hierarchy();
         }
 
-        // TODO: USe the childId/id as the key if true, or default back to auto index key
-        // TODO: use Upsert https://laravel.com/docs/10.x/queries#upserts to update the geonames table
         return $this->buildTree(hierarchy: $hierarchy, nestChildren: $nestChildren);
     }
 
@@ -29,10 +29,8 @@ class PopulateGeonameTableAction
     {
         $hierarchy = [];
 
-        $toastable = new Toastable();
-
         (new ReadFileAction)
-            ->toastable($toastable)
+            ->toastable($this->toastable)
             ->execute(storage_path('geo/hierarchy.txt'))
             ->each(function (string $line) use (&$hierarchy) {
                 [$parentId, $childId] = array_map('trim', explode("\t", $line));
@@ -53,8 +51,8 @@ class PopulateGeonameTableAction
 
         $root = [
             'id' => $rootId,
-            'left' => $index++,
-            'right' => null,
+            '_lft' => $index++,
+            '_rgt' => null,
             'depth' => $depth,
             'parent_id' => null,
         ];
@@ -67,7 +65,7 @@ class PopulateGeonameTableAction
             nestChildren: $nestChildren
         );
 
-        $root['right'] = $index++;
+        $root['_rgt'] = $index++;
 
         if ($nestChildren) {
             $root['children'] = $children;
@@ -89,8 +87,8 @@ class PopulateGeonameTableAction
             $node =
                 [
                     'id' => $id,
-                    'left' => $index++,
-                    'right' => null,
+                    '_lft' => $index++,
+                    '_rgt' => null,
                     'depth' => $depth,
                     'parent_id' => $parentId,
                 ];
@@ -107,8 +105,9 @@ class PopulateGeonameTableAction
                 $node['children'] = $children;
             }
 
-            $node['right'] = $index++;
+            $node['_rgt'] = $index++;
 
+            // INFO: if we are not nesting the children(default), then use the id as the key
             if ($nestChildren) {
                 $result[] = $node;
             } else {
