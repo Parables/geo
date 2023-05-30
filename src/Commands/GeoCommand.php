@@ -6,18 +6,17 @@ namespace Parables\Geo\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\LazyCollection;
-use Parables\Geo\Actions\BuildNestedSetAction;
 use Parables\Geo\Actions\BuildNestedSetModelAction;
 use Parables\Geo\Actions\Concerns\Toaster;
 use Parables\Geo\Actions\Contracts\Toastable;
 use Parables\Geo\Actions\DownloadAction;
 use Parables\Geo\Actions\FilterFileNames;
 use Parables\Geo\Actions\GetDownloadLinksAction;
+use Parables\Geo\Actions\GetHierarchyAction;
 use Parables\Geo\Actions\ListCountries;
 use Parables\Geo\Actions\LoadGeonamesAction;
-use Parables\Geo\Actions\ReadFileAction;
+use Parables\Geo\Actions\ReadFilesAction;
 use Parables\Geo\Actions\TransformGeonamesAction;
 use Parables\Geo\Actions\UnzipAction;
 
@@ -34,32 +33,39 @@ class GeoCommand extends Command implements Toastable
 
     public function handle(): int
     {
-        ini_set('memory_limit', -1);
+        try {
 
-        $proceed = $this->introduceCommand();
+            ini_set('memory_limit', -1);
 
-        if (!$proceed) {
-            $this->info('Terminating installation... Goodbye');
+            $proceed = $this->introduceCommand();
+
+            if (!$proceed) {
+                $this->info('Terminating installation... Goodbye');
+                return self::SUCCESS;
+            }
+
+            $countries = $this->fetchCountries();
+
+            $fileNames = $this->askToSelectCountries(countries: $countries);
+
+            $this->downloadFiles(fileNames: $fileNames);
+
+            $fileNames = $this->unzipFiles(fileNames: array_slice($fileNames, 1)); // skip admin2Codes.txt
+
+            $contentsOfGeonameFiles = $this->readGeonameFiles(fileNames: array_slice($fileNames, 2)); // skip admin2Codes.txt and hierarchy.txt
+
+            $nestedSet = $this->buildNestedSetModel(contentsOfGeonameFiles: $contentsOfGeonameFiles);
+
+            $this->loadGeonames(contentsOfGeonameFiles: $contentsOfGeonameFiles, nestedSet: $nestedSet);
+
+            $this->newLine(2);
+            $this->comment('All done... Enjoy :-)');
             return self::SUCCESS;
+        } catch (\Throwable $th) {
+            $this->error($th->__toString());
+            throw $th;
         }
-
-        // $countries = $this->fetchCountries();
-
-        // $fileNames = $this->askToSelectCountries(countries: $countries);
-
-        // $this->downloadFiles(fileNames: $fileNames);
-
-        // $fileNames = $this->unzipFiles(fileNames: $fileNames);
-
-        // $files = $this->readFiles(fileNames: $fileNames);
-
-        // $this->loadGeonames(files: $files);
-
-        $this->buildNestedSetModel();
-
-        $this->newLine(2);
-        $this->comment('All done... Enjoy :-)');
-        return self::SUCCESS;
+        return self::FAILURE;
     }
 
     public function introduceCommand(): bool
@@ -89,6 +95,7 @@ class GeoCommand extends Command implements Toastable
             if ($fetchUpdates) {
                 return $this->fetchUpdates(cacheFile: $cacheFile);
             }
+
             // read from cache
             return Arr::wrap(json_decode(file_get_contents($cacheFile), associative: true));
         }
@@ -115,16 +122,14 @@ class GeoCommand extends Command implements Toastable
         $this->info('Update complete...');
         $this->info('Fetched ' . count($countries) . ' countries from: ' . self::GEONAMES_ORG);
 
-        // write to cache
-        $stream = fopen($cacheFile, 'w');
-        fwrite(stream: $stream, data: json_encode($countries, JSON_PRETTY_PRINT));
-        fclose($stream);
+        $this->writeToFile(fileName: $cacheFile, content: $countries);
 
         return $countries;
     }
 
     /**
      * @param array<int,string> $countries
+     * @return array<int,string>
      */
     public function askToSelectCountries(array $countries): array
     {
@@ -167,12 +172,12 @@ class GeoCommand extends Command implements Toastable
 
     /**
      * @param array<int,string> $countryCodes
+     * @return array<int,string>
      */
     public function appendFileExtension(array $countryCodes): array
     {
-        $fileNames = array_map(fn ($code) => $code . '.zip', $countryCodes);
-        $fileNames[] = 'no-country.zip';
-        return $fileNames;
+        $fileNames = ['admin2Codes.txt', 'hierarchy.zip', 'no-country.zip'];
+        return $fileNames + array_map(fn ($code) => $code . '.zip', $countryCodes);
     }
 
     /**
@@ -198,6 +203,7 @@ class GeoCommand extends Command implements Toastable
             $downloadAction->execute(fileName: $fileName, overwrite: $overwrite);
         });
     }
+
     /**
      * @param array<int,mixed> $fileNames
      */
@@ -214,51 +220,76 @@ class GeoCommand extends Command implements Toastable
 
         return $result;
     }
-
     /**
      * @param array<int,string> $fileNames
      * @return LazyCollection<int, LazyCollection>
      */
-    public function readFiles(array $fileNames): LazyCollection
+    public function readGeonameFiles(array $fileNames): LazyCollection
     {
-        $readFileAction = (new ReadFileAction)->toastable($this);
-
-        return LazyCollection::make(function () use ($fileNames, $readFileAction) {
-            foreach ($fileNames as $fileName) {
-                yield $readFileAction->execute($fileName);
-            }
-        });
+        return (new ReadFilesAction)->toastable($this)->execute($fileNames);
     }
 
     /**
-     * @param LazyCollection<int, LazyCollection> $files
+     * @param LazyCollection<int, LazyCollection> $contentsOfGeonameFiles
      */
-    public function loadGeonames(LazyCollection $files): void
+    public function buildNestedSetModel(LazyCollection $contentsOfGeonameFiles): array
+    {
+        $this->info('Getting hierarchy...');
+        $hierarchy = (new GetHierarchyAction)
+            ->toastable($this)
+            ->execute(contentsOfGeonameFiles: $contentsOfGeonameFiles);
+        $this->writeToFile(fileName: storage_path('geo/hierarchy.json'), content: $hierarchy);
+
+        $this->info('Building Nested Set Model...');
+        $nestedSet = (new BuildNestedSetModelAction)
+            ->toastable($this)
+            ->execute(hierarchy: $hierarchy, nestChildren: false);
+
+        $result = $nestedSet->all();
+        $this->writeToFile(fileName: storage_path('geo/nestedSet.json'), content: $result);
+        $this->info("Nested Set Model was built successfully");
+
+        return $result;
+    }
+
+
+    /**
+     * @param LazyCollection<int, LazyCollection> $contentsOfGeonameFiles
+     * @param array $nestedSet
+     */
+    public function loadGeonames(LazyCollection $contentsOfGeonameFiles, array $nestedSet): void
     {
         $this->newLine(2);
-        $this->info('Processing file contents in batches...');
+        $this->info("Loading geonames into database...");
         $this->info('This might take a while so please be patient...');
 
-        $progressBar = $this->output->createProgressBar($files->count());
+        $progressBar = $this->output->createProgressBar($contentsOfGeonameFiles->count());
         $progressBar->start();
 
         $transformGeonamesAction = (new TransformGeonamesAction)->toastable($this);
         $loadGeonamesAction = (new LoadGeonamesAction)->toastable($this);
 
-        $chunks = $files->chunk(50);
-        $chunks->each(function (LazyCollection $files, int $index) use ($transformGeonamesAction, $loadGeonamesAction, $chunks, $progressBar) {
-            $this->newLine(2);
-            $this->info('Processing batch: ' . $index . '/' . $chunks->count());
+        $geonameFile = storage_path('geo/geonames.json');
+        $stream = fopen(filename: $geonameFile, mode: 'w');
 
-            $files->each(function (LazyCollection $lines) use ($transformGeonamesAction, $loadGeonamesAction, $progressBar) {
+        $chunks = $contentsOfGeonameFiles->chunk(50);
+        $chunks->each(function (LazyCollection $contentsOfGeonameFiles, int $index) use ($stream,  $nestedSet, $transformGeonamesAction, $loadGeonamesAction, $chunks, $progressBar) {
+            $this->info('Processing batch: ' . ($index + 1) . '/' . $chunks->count());
+
+            $contentsOfGeonameFiles->each(function (LazyCollection $fileContents) use ($stream,  $nestedSet, $transformGeonamesAction, $loadGeonamesAction, $progressBar) {
                 $this->newLine(2);
 
+                $geonamesCollection = $transformGeonamesAction->execute(
+                    lines: $fileContents,
+                    nestedSet: $nestedSet,
+                    toPayload: true,
+                    idAsindex: true
+                );
+
+                fwrite(stream: $stream, data: json_encode($geonamesCollection, JSON_PRETTY_PRINT));
+
                 $loadGeonamesAction->execute(
-                    geonamesCollection: $transformGeonamesAction->execute(
-                        lines: $lines,
-                        toPayload: true,
-                        idAsindex: true
-                    ),
+                    geonamesCollection: $geonamesCollection,
                     chunkSize: 1000,
                     truncateBeforeInsert: false
                 );
@@ -266,30 +297,21 @@ class GeoCommand extends Command implements Toastable
             });
         });
 
+        fclose(stream: $stream);
+
         $progressBar->finish();
     }
 
-    public function buildNestedSetModel(): void
+    private function writeToFile(string $fileName, mixed $content, string $mode = 'w'): void
     {
-        $this->info('Building Nested Set Model...');
+        $this->info('Writing to file: ' . $fileName);
 
-        // Download and unzip the hierarchy.zip file
-        $fileNames =  ['hierarchy.zip'];
-        $this->downloadFiles(fileNames: $fileNames);
-        $this->unzipFiles(fileNames: $fileNames);
-
-        // then the BuildNestedSetModelAction will take it from there
-        LazyCollection::wrap(
-            (new BuildNestedSetModelAction)
-                ->toastable($this)
-                ->execute()
-        )->chunk(1000)
-            ->each(function (LazyCollection $collection) {
-                $collection->each(function (array $payload) {
-                    DB::table('geonames')->where('id', $payload['id'])->update($payload);
-                });
-            });
+        // write to cache
+        $stream = fopen($fileName, $mode);
+        fwrite(stream: $stream, data: json_encode($content, JSON_PRETTY_PRINT));
+        fclose($stream);
     }
+
 
     // TODO: Download and process the postal codes from https://download.geonames.org/export/zip/
     // $auxilaryFileNames = ['hierarchy.zip', /*'alternateNamesV2.zip',*/ 'countryInfo.txt',];

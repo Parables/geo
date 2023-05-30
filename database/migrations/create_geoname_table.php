@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -10,6 +12,10 @@ return new class extends Migration
     {
         Schema::create('geonames', function (Blueprint $table) {
             $table->string('id')->primary();
+            $table->string('parent_id')->index()->nullable();
+            $table->bigInteger('lft')->default(0);
+            $table->bigInteger('rgt')->default(0);
+            $table->integer('depth')->default(0);
             $table->string('name');
             $table->string('ascii_name');
             $table->longText('alternate_names');
@@ -28,15 +34,15 @@ return new class extends Migration
             $table->string('dem')->nullable();
             $table->string('timezone')->nullable();
             $table->string('modification_date')->nullable();
-            $table->nestedSet();
-            $table->integer('depth')->nullable();
             $table->timestamps();
+
+            $table->index(columns: ['lft', 'rgt', 'parent_id']);
         });
     }
     public function down()
     {
         Schema::table('table', function (Blueprint $table) {
-            $table->dropNestedSet();
+            $table->drop();
         });
     }
 };

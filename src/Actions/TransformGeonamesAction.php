@@ -13,11 +13,18 @@ class TransformGeonamesAction
     use HasToastable;
     /**
      * @param LazyCollection $lines
+     * @param array $nestedSet
      */
-    public function execute(LazyCollection $lines, bool $toPayload = true, bool $idAsindex = true): LazyCollection
+    public function execute(LazyCollection $lines, array $nestedSet, bool $toPayload = true, bool $idAsindex = true): LazyCollection
     {
-        $geonamesCollection = $lines->map(function (string $line, string &$key) use ($toPayload, $idAsindex) {
+        $geonamesCollection = $lines->map(function (string $line, string &$key) use ($nestedSet, $toPayload, $idAsindex) {
             $geoname = GeoName::fromString($line);
+
+            $node =  $nestedSet[$geoname->id()] ?? null;
+            if (!empty($node)) {
+                $geoname->nodeFromPayload($node);
+            }
+
             $key = $idAsindex ? $geoname->id() : $key;
             return $toPayload ? $geoname->toPayload() : $geoname;
         });

@@ -21,13 +21,16 @@ class ReadFileAction
             return LazyCollection::empty();
         }
 
-        $this->toastable->toast('Reading file: ' . $fileName);
+        // $this->toastable->toast('Reading file: ' . $fileName);
 
         $collection = LazyCollection::make(function () use ($fileName) {
             $fileStream = fopen($fileName, 'r');
-
-            while (($line = fgets($fileStream)) !== false) {
-                yield $line;
+            try {
+                while (($line = fgets($fileStream)) !== false) {
+                    yield $line;
+                }
+            } finally {
+                fclose($fileStream);
             }
         });
 

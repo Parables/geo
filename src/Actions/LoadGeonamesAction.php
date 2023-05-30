@@ -23,10 +23,11 @@ class LoadGeonamesAction
             DB::table('geonames')->truncate();
         }
 
-        return $geonamesCollection
-            ->chunk($chunkSize)
-            ->each(function (LazyCollection $collection) {
-                DB::table('geonames')->insertOrIgnore($collection->all());
-            });
+        $chunks = $geonamesCollection->chunk($chunkSize);
+
+        return $chunks->each(function (LazyCollection $collection, int $index) use ($chunks) {
+            $this->toastable->toast("Inserting next batch... " . ($index + 1) . "/" . $chunks->count());
+            DB::table('geonames')->insertOrIgnore($collection->all());
+        });
     }
 }

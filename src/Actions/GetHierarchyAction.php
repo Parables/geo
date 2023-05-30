@@ -18,6 +18,8 @@ class GetHierarchyAction
      */
     public function execute(LazyCollection $contentsOfGeonameFiles): array
     {
+        ini_set('memory_limit', -1);
+
         return $this->hierarchyForCitiesTowns(contentsOfGeonameFiles: $contentsOfGeonameFiles);
     }
 
@@ -60,6 +62,9 @@ class GetHierarchyAction
     public  function hierarchyForCitiesTowns(LazyCollection $contentsOfGeonameFiles, array $admin2Codes = [], array $hierarchy = []): array
     {
 
+        $this->toastable->toast("\n\n");
+        $this->toastable->toast("Mapping cities and towns to the respective ADM2 division...");
+
         if (empty($admin2Codes)) {
             $admin2Codes = $this->admins2Codes();
         }
@@ -71,11 +76,9 @@ class GetHierarchyAction
 
         $chunks = $contentsOfGeonameFiles->chunk(50);
         $chunks->each(function (LazyCollection $contentsOfGeonameFiles, int $index) use ($chunks, $admin2Codes, &$hierarchy) {
-            $this->toastable->toast("\n\n");
-            $this->toastable->toast('Processing batch: ' . $index . '/' . $chunks->count());
+            $this->toastable->toast('Processing batch: ' . ($index + 1) . '/' . $chunks->count());
 
             $contentsOfGeonameFiles->each(function (LazyCollection $fileContents) use ($admin2Codes, &$hierarchy) {
-                // $this->newLine(2);
                 $fileContents->each(function (string $line) use ($admin2Codes, &$hierarchy) {
                     $geoname = GeoName::fromString(line: $line);
                     if ($geoname->isCityTown()) {

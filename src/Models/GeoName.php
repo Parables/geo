@@ -47,8 +47,8 @@ class GeoName extends Model
         'modification_date',
         'created_at',
         'updated_at',
-        '_lft',
-        '_rgt',
+        'lft',
+        'rgt',
         'parent_id',
     ];
 }

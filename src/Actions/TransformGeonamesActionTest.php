@@ -10,16 +10,25 @@ it('maps a countryCollection and returns a GeoName instance or an array payload'
 
     $toastable  = new Toastable();
 
-    $geonamesCollection = (new ReadFileAction)
+    $toastable->toast('Reading GH.txt... ');
+    $lines = (new ReadFileAction)
         ->toastable($toastable)
-        //    ->execute(storage_path('geo/GH.txt'));
-        ->execute(storage_path('geo/allCountries.txt'));
+        ->execute(storage_path('geo/GH.txt'));
+    //->execute(storage_path('geo/allCountries.txt'));
 
-    $geonamesCollection = (new TransformGeonamesAction)
+    $toastable->toast('Reading hierarchy.txt...');
+    $nestedSet = (new BuildNestedSetModelAction)->toastable(new Toastable)->execute();
+
+    $stream = fopen(storage_path("geo/nestedSet.json"), 'w');
+    fwrite($stream, json_encode($nestedSet, JSON_PRETTY_PRINT));
+    fclose($stream);
+
+    $toastable->toast('Transforming GeoNames...');
+    $lines = (new TransformGeonamesAction)
         ->toastable($toastable)
-        ->execute($geonamesCollection);
+        ->execute($lines, $nestedSet);
 
-    print_r($geonamesCollection->all());
+    print_r($lines->all());
 
     expect('hi')->toBe('hi');
 });
