@@ -16,13 +16,13 @@
         }
     ],
     "require": {
-        "php": "^8.1",
+        "php": "*",
         "gazsp/baum": "^2.0",
-        "illuminate/contracts": "^10.0",
+        "illuminate/contracts": "*",
         "kalnoy/nestedset": "^6.0",
-        "league/csv": "^9.9",
-        "nikic/iter": "^2.2",
-        "spatie/laravel-package-tools": "^1.14.0",
+        "league/csv": "^9.21",
+        "nikic/iter": "^2.4",
+        "spatie/laravel-package-tools": "^1.18",
         "vhood/tree-converter": "^1.1"
     },
     "require-dev": {
