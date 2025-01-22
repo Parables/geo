@@ -6,6 +6,7 @@ namespace Parables\Geo\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\LazyCollection;
 use Parables\Geo\Actions\BuildNestedSetModelAction;
 use Parables\Geo\Actions\Concerns\Toaster;
@@ -43,6 +44,8 @@ class GeoCommand extends Command implements Toastable
                 $this->info('Terminating installation... Goodbye');
                 return self::SUCCESS;
             }
+
+            Storage::disk('local')->makeDirectory('geo');
 
             $countries = $this->fetchCountries();
 
