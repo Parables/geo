@@ -13,6 +13,21 @@ class GeoName extends Model
     use NodeTrait;
     use GeoNameTrait;
 
+ /**
+     * The "type" of the primary key ID.
+     *
+     * @var string
+     */
+    protected $keyType = 'string';
+
+    /**
+     * Indicates if the IDs are auto-incrementing.
+     *
+     * @var bool
+     */
+    public $incrementing = false;
+
+
     /**
      * The table associated with the model.
      *
@@ -27,6 +42,10 @@ class GeoName extends Model
      */
     protected $fillable = [
         'id',
+        'parent_id',
+        'lft',
+        'rgt',
+        'depth',
         'name',
         'ascii_name',
         'alternate_names',
@@ -45,10 +64,5 @@ class GeoName extends Model
         'dem',
         'timezone',
         'modification_date',
-        'created_at',
-        'updated_at',
-        'lft',
-        'rgt',
-        'parent_id',
     ];
 }

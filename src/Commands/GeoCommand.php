@@ -6,8 +6,10 @@ namespace Parables\Geo\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\LazyCollection;
+use Illuminate\Support\Collection;
 use Parables\Geo\Actions\BuildNestedSetModelAction;
 use Parables\Geo\Actions\Concerns\Toaster;
 use Parables\Geo\Actions\Contracts\Toastable;
@@ -51,15 +53,24 @@ class GeoCommand extends Command implements Toastable
 
             $fileNames = $this->askToSelectCountries(countries: $countries);
 
-            $this->downloadFiles(fileNames: $fileNames);
+            $overwrite = $this->downloadFiles(fileNames: $fileNames);
 
-            $fileNames = $this->unzipFiles(fileNames: array_slice($fileNames, 1)); // skip admin2Codes.txt
+            $fileNames = $this->unzipFiles(
+                fileNames: array_slice($fileNames, 1),
+                overwrite: $overwrite,
+            ); // skip admin2Codes.txt
 
             $contentsOfGeonameFiles = $this->readGeonameFiles(fileNames: array_slice($fileNames, 2)); // skip admin2Codes.txt and hierarchy.txt
 
-            $nestedSet = $this->buildNestedSetModel(contentsOfGeonameFiles: $contentsOfGeonameFiles);
+            // NOTE: buildHierarchy now inserts each geoname as it iterates over the lines for each file
+            // NOTE: It also inserts the hierarchy into the database
+            $hierarchy = $this->buildHierarchy(contentsOfGeonameFiles: $contentsOfGeonameFiles);
 
-            $this->loadGeonames(contentsOfGeonameFiles: $contentsOfGeonameFiles, nestedSet: $nestedSet);
+            // NOTE: I am disabling the nestedSetModel feature for now...
+            // We will use the hierarchy table and the geonmaes table for querying
+            // $nestedSet = $this->buildNestedSetModel(hierarchy: $hierarchy);
+
+            // $this->loadGeonames(contentsOfGeonameFiles: $contentsOfGeonameFiles, nestedSet: $nestedSet);
 
             $this->newLine(2);
             $this->comment('All done... Enjoy :-)');
@@ -180,13 +191,11 @@ class GeoCommand extends Command implements Toastable
     public function appendFileExtension(array $countryCodes): array
     {
         $fileNames = ['admin2Codes.txt', 'hierarchy.zip', 'no-country.zip'];
-        return $fileNames + array_map(fn ($code) => $code . '.zip', $countryCodes);
+        return $fileNames + array_map(fn($code) => $code . '.zip', $countryCodes);
     }
 
-    /**
-     * @param array<int,string> $fileNames
-     */
-    public function downloadFiles(array $fileNames): void
+    /** @param array<int,string> $fileNames */
+    public function downloadFiles(array $fileNames): bool
     {
         $overwrite = $this->choice(
             question: 'Download is about to begin... What should be done if the file has already been downloaded?',
@@ -205,20 +214,24 @@ class GeoCommand extends Command implements Toastable
         $this->withProgressBar($fileNames, function (string $fileName) use ($downloadAction, $overwrite) {
             $downloadAction->execute(fileName: $fileName, overwrite: $overwrite);
         });
+
+        return $overwrite;
     }
 
-    /**
-     * @param array<int,mixed> $fileNames
-     */
-    public function unzipFiles(array $fileNames): array
+    /** @param array<int,mixed> $fileNames */
+    public function unzipFiles(array $fileNames, bool $overwrite = true): array
     {
         $this->info('Unzipping compressed files...');
 
         $result = [];
         $unzipAction = (new UnzipAction)->toastable($this);
 
-        $this->withProgressBar($fileNames, function (string $fileName) use ($unzipAction, &$result) {
-            $result[] = $unzipAction->execute(fileName: $fileName, overwrite: true);
+        $this->withProgressBar($fileNames, function (string $fileName)
+        use ($unzipAction, &$result, $overwrite) {
+            $result[] = $unzipAction->execute(
+                fileName: $fileName,
+                overwrite: $overwrite,
+            );
         });
 
         return $result;
@@ -232,17 +245,46 @@ class GeoCommand extends Command implements Toastable
         return (new ReadFilesAction)->toastable($this)->execute($fileNames);
     }
 
-    /**
-     * @param LazyCollection<int, LazyCollection> $contentsOfGeonameFiles
-     */
-    public function buildNestedSetModel(LazyCollection $contentsOfGeonameFiles): array
+    /** @param LazyCollection<int, LazyCollection> $contentsOfGeonameFiles */
+    public function buildHierarchy(LazyCollection $contentsOfGeonameFiles): Collection
     {
         $this->info('Getting hierarchy...');
-        $hierarchy = (new GetHierarchyAction)
-            ->toastable($this)
-            ->execute(contentsOfGeonameFiles: $contentsOfGeonameFiles);
-        $this->writeToFile(fileName: storage_path('geo/hierarchy.json'), content: $hierarchy);
 
+        $hierarchyCacheFile = storage_path('/geo/hierarchy.json');
+
+        $buildFromScratch = function (LazyCollection $contentsOfGeonameFiles) {
+            $this->info('Building hierarchy from scratch...');
+            return (new GetHierarchyAction)
+                ->toastable($this)
+                ->execute(contentsOfGeonameFiles: $contentsOfGeonameFiles);
+        };
+
+        if (file_exists($hierarchyCacheFile)) {
+            $shouldRebuild = $this->confirm(
+                question: "The $hierarchyCacheFile file already exists. Would you like to rebuild it from scratch?",
+                default: false
+            );
+
+            if ($shouldRebuild) {
+                $hierarchy = $buildFromScratch($contentsOfGeonameFiles);
+            } else {
+                $this->info("Reading the hierarchy from: $hierarchyCacheFile");
+                // read from cache
+                $hierarchy = Arr::wrap(json_decode(
+                    file_get_contents($hierarchyCacheFile),
+                    associative: true,
+                ));
+            }
+        } else {
+            $hierarchy = $buildFromScratch($contentsOfGeonameFiles);
+        }
+
+        return $hierarchy;
+    }
+
+    public function buildNestedSetModel(LazyCollection $hierarchy): array
+    {
+        return [];
         $this->info('Building Nested Set Model...');
         $nestedSet = (new BuildNestedSetModelAction)
             ->toastable($this)
@@ -260,7 +302,7 @@ class GeoCommand extends Command implements Toastable
      * @param LazyCollection<int, LazyCollection> $contentsOfGeonameFiles
      * @param array $nestedSet
      */
-    public function loadGeonames(LazyCollection $contentsOfGeonameFiles, array $nestedSet): void
+    public function loadGeonames(LazyCollection $contentsOfGeonameFiles, array $nestedSet = []): void
     {
         $this->newLine(2);
         $this->info("Loading geonames into database...");
@@ -276,10 +318,25 @@ class GeoCommand extends Command implements Toastable
         $stream = fopen(filename: $geonameFile, mode: 'w');
 
         $chunks = $contentsOfGeonameFiles->chunk(50);
-        $chunks->each(function (LazyCollection $contentsOfGeonameFiles, int $index) use ($stream,  $nestedSet, $transformGeonamesAction, $loadGeonamesAction, $chunks, $progressBar) {
+        $chunks->each(function (LazyCollection $contentsOfGeonameFiles, int $index)
+        use (
+            $stream,
+            $nestedSet,
+            $transformGeonamesAction,
+            $loadGeonamesAction,
+            $chunks,
+            $progressBar,
+        ) {
             $this->info('Processing batch: ' . ($index + 1) . '/' . $chunks->count());
 
-            $contentsOfGeonameFiles->each(function (LazyCollection $fileContents) use ($stream,  $nestedSet, $transformGeonamesAction, $loadGeonamesAction, $progressBar) {
+            $contentsOfGeonameFiles->each(function (LazyCollection $fileContents)
+            use (
+                $stream,
+                $nestedSet,
+                $transformGeonamesAction,
+                $loadGeonamesAction,
+                $progressBar,
+            ) {
                 $this->newLine(2);
 
                 $geonamesCollection = $transformGeonamesAction->execute(
@@ -289,7 +346,13 @@ class GeoCommand extends Command implements Toastable
                     idAsindex: true
                 );
 
-                fwrite(stream: $stream, data: json_encode($geonamesCollection, JSON_PRETTY_PRINT));
+                fwrite(
+                    stream: $stream,
+                    data: json_encode(
+                        $geonamesCollection->all(),
+                        JSON_PRETTY_PRINT,
+                    ),
+                );
 
                 $loadGeonamesAction->execute(
                     geonamesCollection: $geonamesCollection,

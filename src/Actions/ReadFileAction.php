@@ -21,8 +21,6 @@ class ReadFileAction
             return LazyCollection::empty();
         }
 
-        // $this->toastable->toast('Reading file: ' . $fileName);
-
         $collection = LazyCollection::make(function () use ($fileName) {
             $fileStream = fopen($fileName, 'r');
             try {

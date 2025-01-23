@@ -10,6 +10,10 @@ class GeoName
 {
     private function __construct(
         private string $id,
+        private string $parent_id,
+        private int|string $lft,
+        private int|string $rgt,
+        private int|string $depth,
         private string $name,
         private string $ascii_name,
         private string $alternate_names,
@@ -28,10 +32,6 @@ class GeoName
         private string $dem,
         private string $timezone,
         private string $modification_date,
-        private int|string $lft,
-        private int|string $rgt,
-        private int|string $depth,
-        private string $parent_id,
     ) {
     }
 
@@ -43,6 +43,27 @@ class GeoName
     public function id(): string
     {
         return $this->id;
+    }
+
+    private function parentId(): string
+    {
+        return $this->parent_id;
+    }
+
+    private function lft(): int
+
+    {
+        return intval($this->lft);
+    }
+
+    private function rgt(): int
+    {
+        return intval($this->rgt);
+    }
+
+    private function depth(): int
+    {
+        return intval($this->depth);
     }
 
     public function name(): string
@@ -133,27 +154,6 @@ class GeoName
     public function modificationDate(): string
     {
         return $this->modification_date;
-    }
-
-    private function lft(): int
-
-    {
-        return intval($this->lft);
-    }
-
-    private function rgt(): int
-    {
-        return intval($this->rgt);
-    }
-
-    private function depth(): int
-    {
-        return intval($this->depth);
-    }
-
-    private function parentId(): string
-    {
-        return $this->parent_id;
     }
 
     public function isEarth(): bool
@@ -294,6 +294,10 @@ class GeoName
     {
         return [
             "id" => $this->id(),
+            "parent_id" => $this->parentId(),
+            "lft" => $this->lft(),
+            "rgt" => $this->rgt(),
+            "depth" => $this->depth(),
             "name" => $this->name(),
             "ascii_name" => $this->asciiName(),
             "alternate_names" => $this->alternateNames(),
@@ -312,10 +316,6 @@ class GeoName
             "dem" => $this->dem(),
             "timezone" => $this->timezone(),
             "modification_date" => $this->modificationDate(),
-            "lft" => $this->lft(),
-            "rgt" => $this->rgt(),
-            "depth" => $this->depth(),
-            "parent_id" => $this->parentId(),
         ];
     }
 }

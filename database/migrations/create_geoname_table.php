@@ -10,6 +10,11 @@ return new class extends Migration
 {
     public function up()
     {
+        Schema::create('geonames_hierarchy', function (Blueprint $table) {
+            $table->string('parent_id')->primary();
+            $table->string('child_id')->primary();
+        });
+
         Schema::create('geonames', function (Blueprint $table) {
             $table->string('id')->primary();
             $table->string('parent_id')->index()->nullable();
@@ -41,8 +46,7 @@ return new class extends Migration
     }
     public function down()
     {
-        Schema::table('table', function (Blueprint $table) {
-            $table->drop();
-        });
+        Schema::dropIfExists('geonames_hierarchy');
+        Schema::dropIfExists('geonames');
     }
 };
